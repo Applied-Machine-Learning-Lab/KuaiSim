@@ -14,13 +14,12 @@ class BackboneUserEncoder(BaseModel):
     def parse_model_args(parser):
         '''
         args:
-        - user_latent_dim
-        - item_latent_dim
-        - transformer_enc_dim
-        - transformer_n_head
-        - transformer_d_forward
-        - transformer_n_layer
-        - state_hidden_dims
+        - state_user_latent_dim
+        - state_item_latent_dim
+        - state_transformer_enc_dim
+        - state_transformer_n_head
+        - state_transformer_d_forward
+        - state_transformer_n_layer
         - state_dropout_rate
         - from BaseModel:
             - model_path
@@ -29,33 +28,30 @@ class BackboneUserEncoder(BaseModel):
         '''
         parser = BaseModel.parse_model_args(parser)
         
-        parser.add_argument('--user_latent_dim', type=int, default=16, 
+        parser.add_argument('--state_user_latent_dim', type=int, default=16, 
                             help='user latent embedding size')
-        parser.add_argument('--item_latent_dim', type=int, default=16, 
+        parser.add_argument('--state_item_latent_dim', type=int, default=16, 
                             help='item latent embedding size')
-        parser.add_argument('--transformer_enc_dim', type=int, default=32, 
+        parser.add_argument('--state_transformer_enc_dim', type=int, default=32, 
                             help='item encoding size')
-        parser.add_argument('--transformer_n_head', type=int, default=4, 
+        parser.add_argument('--state_transformer_n_head', type=int, default=4, 
                             help='number of attention heads in transformer')
-        parser.add_argument('--transformer_d_forward', type=int, default=64, 
+        parser.add_argument('--state_transformer_d_forward', type=int, default=64, 
                             help='forward layer dimension in transformer')
-        parser.add_argument('--transformer_n_layer', type=int, default=2, 
+        parser.add_argument('--state_transformer_n_layer', type=int, default=2, 
                             help='number of encoder layers in transformer')
-        parser.add_argument('--state_hidden_dims', type=int, nargs="+", default=[128], 
-                            help='hidden dimensions of final state encoding layers')
         parser.add_argument('--state_dropout_rate', type=float, default=0.1, 
                             help='dropout rate in deep layers of state encoder')
         return parser
         
-    def __init__(self, args, reader_stats, device):
-        self.user_latent_dim = args.user_latent_dim
-        self.item_latent_dim = args.item_latent_dim
-        self.enc_dim = args.transformer_enc_dim
-        self.state_dim = self.enc_dim
-        self.attn_n_head = args.transformer_n_head
-        self.state_hidden_dims = args.state_hidden_dims
+    def __init__(self, args, reader_stats):
+        self.user_latent_dim = args.state_user_latent_dim
+        self.item_latent_dim = args.state_item_latent_dim
+        self.enc_dim = args.state_transformer_enc_dim
+        self.state_dim = 3*self.enc_dim
+        self.attn_n_head = args.state_transformer_n_head
         self.dropout_rate = args.state_dropout_rate
-        super().__init__(args, reader_stats, device)
+        super().__init__(args, reader_stats, args.device)
         
     def to(self, device):
         new_self = super(BackboneUserEncoder, self).to(device)
@@ -63,58 +59,60 @@ class BackboneUserEncoder(BaseModel):
         new_self.pos_emb_getter = new_self.pos_emb_getter.to(device)
         return new_self
 
-    def _define_params(self, args):
+    def _define_params(self, args, reader_stats):
         stats = self.reader_stats
 
         self.user_feature_dims = stats['user_feature_dims'] # {feature_name: dim}
         self.item_feature_dims = stats['item_feature_dims'] # {feature_name: dim}
 
         # user embedding
-        self.uIDEmb = nn.Embedding(stats['n_user']+1, args.user_latent_dim)
+        self.uIDEmb = nn.Embedding(stats['n_user']+1, args.state_user_latent_dim)
         self.uFeatureEmb = {}
         for f,dim in self.user_feature_dims.items():
-            embedding_module = nn.Linear(dim, args.user_latent_dim)
+            embedding_module = nn.Linear(dim, args.state_user_latent_dim)
             self.add_module(f'UFEmb_{f}', embedding_module)
             self.uFeatureEmb[f] = embedding_module
             
         # item embedding
-        self.iIDEmb = nn.Embedding(stats['n_item']+1, args.item_latent_dim)
+        self.iIDEmb = nn.Embedding(stats['n_item']+1, args.state_item_latent_dim)
         self.iFeatureEmb = {}
         for f,dim in self.item_feature_dims.items():
-            embedding_module = nn.Linear(dim, args.item_latent_dim)
+            embedding_module = nn.Linear(dim, args.state_item_latent_dim)
             self.add_module(f'IFEmb_{f}', embedding_module)
             self.iFeatureEmb[f] = embedding_module
         
         # feedback embedding
         self.feedback_types = stats['feedback_type']
         self.feedback_dim = stats['feedback_size']
-        self.feedbackEncoder = nn.Linear(self.feedback_dim, args.transformer_enc_dim)
+        self.feedbackEncoder = nn.Linear(self.feedback_dim, args.state_transformer_enc_dim)
         
         # item embedding kernel encoder
-        self.itemEmbNorm = nn.LayerNorm(args.item_latent_dim)
-        self.userEmbNorm = nn.LayerNorm(args.user_latent_dim)
-        self.itemFeatureKernel = nn.Linear(args.item_latent_dim, args.transformer_enc_dim)
-        self.userFeatureKernel = nn.Linear(args.user_latent_dim, args.transformer_enc_dim)
-        self.encDropout = nn.Dropout(self.dropout_rate)
-        self.encNorm = nn.LayerNorm(args.transformer_enc_dim)
+        self.itemEmbNorm = nn.LayerNorm(args.state_item_latent_dim)
+        self.userEmbNorm = nn.LayerNorm(args.state_user_latent_dim)
+        self.itemFeatureKernel = nn.Linear(args.state_item_latent_dim, args.state_transformer_enc_dim)
+        self.userFeatureKernel = nn.Linear(args.state_user_latent_dim, args.state_transformer_enc_dim)
+        self.encDropout = nn.Dropout(args.state_dropout_rate)
+        self.encNorm = nn.LayerNorm(args.state_transformer_enc_dim)
         
         # positional embedding
         self.max_len = stats['max_seq_len']
-        self.posEmb = nn.Embedding(self.max_len, args.transformer_enc_dim)
+        self.posEmb = nn.Embedding(self.max_len, args.state_transformer_enc_dim)
         self.pos_emb_getter = torch.arange(self.max_len, dtype = torch.long)
         self.attn_mask = ~torch.tril(torch.ones((self.max_len,self.max_len), dtype=torch.bool))
         
         # sequence encoder
-        encoder_layer = nn.TransformerEncoderLayer(d_model=2*args.transformer_enc_dim, 
-                                                   dim_feedforward = args.transformer_d_forward, 
-                                                   nhead=args.transformer_n_head, dropout = args.dropout_rate, 
+        encoder_layer = nn.TransformerEncoderLayer(d_model=2*args.state_transformer_enc_dim, 
+                                                   dim_feedforward = args.state_transformer_d_forward, 
+                                                   nhead=args.state_transformer_n_head, 
+                                                   dropout = args.state_dropout_rate, 
                                                    batch_first = True)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=args.transformer_n_layer)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=args.state_transformer_n_layer)
         
         # DNN state encoder
-        self.stateNorm = nn.LayerNorm(self.state_dim)
-        self.finalStateLayer = DNN(3*args.transformer_enc_dim, args.state_hidden_dims, self.state_dim,
-                                dropout_rate = args.dropout_rate, do_batch_norm = True)
+
+#         self.stateNorm = nn.LayerNorm(self.state_dim)
+#         self.finalStateLayer = DNN(3*args.state_transformer_enc_dim, args.state_hidden_dims, self.state_dim,
+#                                 dropout_rate = args.dropout_rate, do_batch_norm = True)
         
         #self.actionModule = torch.nn.Sigmoid(self.actionModule)
 
@@ -124,8 +122,6 @@ class BackboneUserEncoder(BaseModel):
         - feed_dict: {
             'user_id': (B,)
             'uf_{feature_name}': (B,feature_dim), the user features
-            'item_id': (B,L), the target item
-            'if_{feature_name}': (B,L,feature_dim), the target item features
             'history': (B,max_H)
             'history_if_{feature_name}': (B,max_H,feature_dim), the history item features
         }
@@ -195,7 +191,7 @@ class BackboneUserEncoder(BaseModel):
         # user state (B, 3*enc_dim) combines user history and user profile features
         state = torch.cat([hist_enc,user_enc], 1)
         # (B, enc_dim)
-        state = self.stateNorm(self.finalStateLayer(state))
+#         state = self.stateNorm(self.finalStateLayer(state))
         return {'output_seq': output_seq, 'state': state, 'reg': user_reg + history_reg}
     
     def get_user_encoding(self, user_ids, user_features, B):

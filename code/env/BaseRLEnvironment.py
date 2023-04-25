@@ -2,7 +2,6 @@ from argparse import Namespace
 import torch
 
 import utils
-from env.reward import *
 from model.simulator import *
 from reader import *
 
@@ -90,3 +89,4 @@ class BaseRLEnvironment():
             if 'history_' in k:
                 history[k] = v
         return {'user_profile': profile, 'user_history': history}
+    

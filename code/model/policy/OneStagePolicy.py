@@ -14,38 +14,38 @@ class OneStagePolicy(BaseModel):
         '''
         args:
         - from BackboneUserEncoder:
-            - user_latent_dim
-            - item_latent_dim
-            - transformer_enc_dim
-            - transformer_n_head
-            - transformer_d_forward
-            - transformer_n_layer
-            - state_hidden_dims
+            - state_user_latent_dim
+            - state_item_latent_dim
+            - state_transformer_enc_dim
+            - state_transformer_n_head
+            - state_transformer_d_forward
+            - state_transformer_n_layer
             - state_dropout_rate
             - from BaseModel:
                 - model_path
                 - loss
                 - l2_coef
         '''
-        parser = BaseStateEncoder.parse_model_args(parser)
+        parser = BackboneUserEncoder.parse_model_args(parser)
         return parser
     
-    def __init__(self, args, env, device):
+    def __init__(self, *input_args):
+        args, env = input_args
         self.slate_size = env.slate_size
-        super().__init__(args, env.reader.get_statistics(), device)
+        super().__init__(args, env.reader.get_statistics(), args.device)
         self.display_name = "OneStagePolicy"
-        self.dropout_rate = args.userEncoder.dropout_rate
+        self.dropout_rate = self.user_encoder.dropout_rate
         
     def to(self, device):
-        new_self = super(BaseOnlinePolicy, self).to(device)
-        self.userEncoder.device = device
-        self.userEncoder = self.userEncoder.to(device)
+        new_self = super(OneStagePolicy, self).to(device)
+        self.user_encoder.device = device
+        self.user_encoder = self.user_encoder.to(device)
         return new_self
     
-    def _define_params(self, args):
-        self.userEncoder = BackboneUserEncoder(args, self.reader_stats, self.device)
-        self.enc_dim = self.userEncoder.enc_dim
-        self.state_dim = self.userEncoder.state_dim
+    def _define_params(self, args, reader_stats):
+        self.user_encoder = BackboneUserEncoder(args, reader_stats)
+        self.enc_dim = self.user_encoder.enc_dim
+        self.state_dim = self.user_encoder.state_dim
         self.action_dim = self.slate_size
         
         self.bce_loss = nn.BCEWithLogitsLoss(reduction = 'none')
@@ -96,28 +96,34 @@ class OneStagePolicy(BaseModel):
         feed_dict = {}
         feed_dict.update(observation['user_profile'])
         feed_dict.update(observation['user_history'])
-        B = feed_dict['user_id'].shape[0]
-        return self.userEncoder(feed_dict, B)
+        return self.user_encoder.get_forward(feed_dict)
     
     def get_loss_observation(self):
         return ['loss']
     
     def generate_action(self, state_dict, feed_dict):
         '''
+        List generation provides three main types of exploration:
+        * Greedy top-K: no exploration
+        * Categorical sampling: probabilistic exploration
+        * Uniform sampling: random exploration
+        
         This function will be called in the following places:
-        * OnlineAgent.run_episode_step() with {'action': None, 'response': None, 
-                                               'epsilon': >0, 'do_explore': True, 'is_train': False}
-        * OnlineAgent.step_train() with {'action': tensor, 'response': {'reward': , 'immediate_response': }, 
-                                         'epsilon': 0, 'do_explore': False, 'is_train': True}
-        * OnlineAgent.test() with {'action': None, 'response': None, 
-                                   'epsilon': 0, 'do_explore': False, 'is_train': False}
+        * agent.run_episode_step() during online inference, corresponding input_dict:
+            {'action': None, 'response': None, 'epsilon': >0, 'do_explore': True, 'is_train': False}
+        * agent.step_train() during online training, correpsonding input_dict:
+            {'action': tensor, 'response': see buffer.sample@output - user_response, 
+             'epsilon': 0, 'do_explore': False, 'is_train': True}
+        * agent.test() during test, corresponding input_dict:
+            {'action': None, 'response': None, 'epsilon': 0, 'do_explore': False, 'is_train': False}
         
         @input:
         - state_dict: {'state': (B, state_dim), ...}
-        - feed_dict: {'candidates': ...}
+        - feed_dict: same as self.get_forward@input - feed_dict
         @output:
         - out_dict: {'prob': (B, K), 
                      'action': (B, K), 
+                     'indices': (B, K),
                      'reg': scalar}
         '''
         pass

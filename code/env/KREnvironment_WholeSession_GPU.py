@@ -14,18 +14,26 @@ from env.BaseRLEnvironment import BaseRLEnvironment
 class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
     '''
     KuaiRand simulated environment for list-wise recommendation
-    Components:
-    - multi-behavior user response model: 
-        - (user history, user profile) --> user_state
-        - (user_state, item) --> feedbacks (e.g. click, like, ...)
-    - no user leave model:
-        - users leave when temper drop below 1
-        - temper drop according to users immediate feedbacks
+    Main interface:
+    - parse_model_args: for hyperparameters
+    - reset: reset online environment, monitor, and corresponding initial observation
+    - step: action --> new observation, user feedbacks, and other updated information
+    - get_candidate_info: obtain the entire item candidate pool
+    Main Components:
+    - data reader: self.reader for user profile&history sampler
+    - user immediate response model: see self.get_response
+    - no user leave model: see self.get_leave_signal
+    - candidate item pool: self.candidate_ids, self.candidate_item_meta
+    - history monitor: self.env_history, not set up until self.reset
     '''
     @staticmethod
     def parse_model_args(parser):
         '''
         args:
+        - uirm_log_path
+        - slate_size
+        - episode_batch_size
+        - item_correlation
         - from BaseRLEnvironment
             - max_step_per_episode
             - initial_temper
@@ -39,6 +47,8 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
                             help='episode sample batch size')
         parser.add_argument('--item_correlation', type=float, default=0, 
                             help='magnitude of item correlation')
+        parser.add_argument('--single_response', action='store_true', 
+                            help='only include the first feedback as reward signal')
         return parser
     
     def __init__(self, args):
@@ -70,6 +80,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         self.slate_size = args.slate_size
         self.episode_batch_size = args.episode_batch_size
         self.rho = args.item_correlation
+        self.single_response = args.single_response
         
         infile = open(args.uirm_log_path, 'r')
         class_args = eval(infile.readline()) # example: Namespace(model='RL4RSUserResponse', reader='RL4RSDataReader')
@@ -91,7 +102,10 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         self.max_hist_len = uirm_stats['max_seq_len']
         self.response_types = uirm_stats['feedback_type']
         self.response_dim = len(self.response_types)
-        self.response_weights = torch.tensor(list(self.reader.get_response_weights().values())).to(args.device)
+        self.response_weights = torch.tensor(list(self.reader.get_response_weights().values())).to(torch.float).to(args.device)
+        if args.single_response:
+            self.response_weights = torch.zeros_like(self.response_weights)
+            self.response_weights[0] = 1
         
         
         print("Setup candidate item pool")
@@ -126,8 +140,10 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
     def get_candidate_info(self, feed_dict):
         '''
         Add entire item pool as candidate for the feed_dict
+        @output:
+        - candidate_info: {'item_id': (L,), 
+                           'if_{feature_name}': (n_item, feature_dim)}
         '''
-        B = feed_dict['user_id'].shape[0]
         candidate_info = {'item_id': self.candidate_iids}
         candidate_info.update(self.candidate_item_meta)
         return candidate_info
@@ -157,6 +173,8 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         '''
         if 'empty_history' not in params:
             params['empty_history'] = False
+            
+        # set inference batch size
         if 'batch_size' in params:
             BS = params['batch_size']
         else:
@@ -166,14 +184,18 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         self.batch_iter = iter(DataLoader(self.reader, batch_size = BS, shuffle = True, 
                                           pin_memory = True, num_workers = 8))
         sample_info = next(self.batch_iter)
-        self.current_observation = self.get_observation_from_batch(sample_info)
+        self.sample_batch = self.get_observation_from_batch(sample_info)
+        self.current_observation = self.sample_batch
         self.current_step = torch.zeros(self.episode_batch_size).to(self.device)
+        self.current_sample_head_in_batch = BS
         
         # user temper for leave model
         self.current_temper = torch.ones(self.episode_batch_size).to(self.device) * self.initial_temper
+        self.current_sum_reward = torch.zeros(self.episode_batch_size).to(self.device)
 
         # batch-wise monitor
-        self.env_history = {'step': [0.], 'leave': [], 'temper': []}
+        self.env_history = {'step': [0.], 'leave': [], 'temper': [],
+                            'coverage': [], 'ILD': []}
         
         return deepcopy(self.current_observation)
         
@@ -185,11 +207,20 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         - step_dict: {'action': (B, slate_size),
                       'action_features': (B, slate_size, item_dim) }
         @output:
+        - new_observation: {'user_profile': {'user_id': (B,), 
+                                             'uf_{feature_name}': (B, feature_dim)}, 
+                            'user_history': {'history': (B, max_H), 
+                                             'history_if_{feature_name}': (B, max_H, feature_dim), 
+                                             'history_{response}': (B, max_H), 
+                                             'history_length': (B, )}}
+        - response_dict: {'immediate_response': see self.get_response@output - response_dict,
+                          'done': (B,)}
+        - update_info: see self.update_observation@output - update_info
         '''
         
         # URM forward
         with torch.no_grad():
-            action = step_dict['action']
+            action = step_dict['action'] # must be indices on candidate_ids
             
             # get user response
             response_dict = self.get_response(step_dict)
@@ -207,19 +238,32 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
             # env_history update: step, leave, temper, converage, ILD
             self.current_step += 1
             n_leave = done_mask.sum()
-            self.env_history['leave'].append(n_leave)
+            self.env_history['leave'].append(n_leave.item())
             self.env_history['temper'].append(torch.mean(self.current_temper).item())
+            self.env_history['coverage'].append(response_dict['coverage'])
+            self.env_history['ILD'].append(response_dict['ILD'])
 
-            # update rows where user left
+            # when users left, new users come into the running batch
             if n_leave > 0:
                 final_steps = self.current_step[done_mask].detach().cpu().numpy()
                 self.env_history['step'].append(np.mean(final_steps))
-                # sample new users to fill in the blank
-                sample_info = self.sample_new_batch_from_reader()
-                new_observation = self.get_observation_from_batch(sample_info)
-                for obs_key in ['user_profile', 'user_history']:
-                    for k,v in new_observation[obs_key].items():
-                        self.current_observation[obs_key][k][done_mask] = v[done_mask]
+
+                if self.current_sample_head_in_batch + n_leave < self.episode_batch_size:
+                    # reuse previous batch if there are sufficient samples for n_leave
+                    head = self.current_sample_head_in_batch
+                    tail = self.current_sample_head_in_batch + n_leave
+                    for obs_key in ['user_profile', 'user_history']:
+                        for k,v in self.sample_batch[obs_key].items():
+                            self.current_observation[obs_key][k][done_mask] = v[head:tail]
+                    self.current_sample_head_in_batch += n_leave
+                else:
+                    # sample new users to fill in the blank
+                    sample_info = self.sample_new_batch_from_reader()
+                    self.sample_batch = self.get_observation_from_batch(sample_info)
+                    for obs_key in ['user_profile', 'user_history']:
+                        for k,v in self.sample_batch[obs_key].items():
+                            self.current_observation[obs_key][k][done_mask] = v[:n_leave]
+                    self.current_sample_head_in_batch = n_leave
                 self.current_step[done_mask] *= 0
                 self.current_temper[done_mask] *= 0
                 self.current_temper[done_mask] += self.initial_temper
@@ -331,6 +375,9 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         - action: (B, slate_size), indices of self.candidate_iids
         - response: (B, slate_size, n_feedback)
         - done_mask: not used in this env
+        @output:
+        - update_info: {slate: (B, slate_size),
+                        updated_observation: same format as self.reset@output - observation}
         '''
         # (B, slate_size), convert to encoded item id
         rec_list = self.candidate_iids[action]
@@ -359,7 +406,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
     def sample_new_batch_from_reader(self):
         '''
         @output
-        - smaple_info: get next episode batch from reader
+        - sample_info: see BaseRLEnvironment.get_observation_from_batch@input - sample_batch
         '''
         new_sample_flag = False
         try:
@@ -381,3 +428,31 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         return iter(DataLoader(self.reader, batch_size = B, shuffle = True, 
                                pin_memory = True, num_workers = 8))
     
+
+    def create_observation_buffer(self, buffer_size):
+        '''
+        @input:
+        - buffer_size: L, scalar
+        @output:
+        - observation: {'user_profile': {'user_id': (L,), 
+                                         'uf_{feature_name}': (L, feature_dim)}, 
+                        'user_history': {'history': (L, max_H), 
+                                         'history_if_{feature_name}': (L, max_H * feature_dim), 
+                                         'history_{response}': (L, max_H), 
+                                         'history_length': (L,)}}
+        '''
+        observation = {'user_profile': {'user_id': torch.zeros(buffer_size).to(torch.long).to(self.device)}, 
+                       'user_history': {'history': torch.zeros(buffer_size, self.max_hist_len).to(torch.long).to(self.device), 
+                                        'history_length': torch.zeros(buffer_size).to(torch.long).to(self.device)}}
+        for f,f_dim in self.observation_space['user_feature_dims'].items():
+            observation['user_profile'][f'uf_{f}'] = torch.zeros(buffer_size, f_dim).to(torch.float).to(self.device)
+        for f,f_dim in self.observation_space['item_feature_dims'].items():
+            observation['user_history'][f'history_if_{f}'] = torch.zeros(buffer_size, f_dim * self.max_hist_len)\
+                                                                                .to(torch.float).to(self.device)
+        for f in self.observation_space['feedback_type']:
+            observation['user_history'][f'history_{f}'] = torch.zeros(buffer_size, self.max_hist_len)\
+                                                                                .to(torch.float).to(self.device)
+        return observation
+    
+    def get_report(self, smoothness = 10):
+        return {k: np.mean(v[-smoothness:]) for k,v in self.env_history.items()}

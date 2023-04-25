@@ -3,24 +3,29 @@ import numpy as np
 from argparse import Namespace
 from tqdm import tqdm
 
-def get_rl_training_info(log_path, episode_features = [], training_losses = []):
+def get_online_training_info(log_path, episode_features = [], training_losses = []):
     episode = []
     episode_report_list = {k: [] for k in episode_features}
     loss_report_list = {k: [] for k in training_losses}
     with open(log_path, 'r') as infile:
-        args = eval(infile.readline())
         for line in tqdm(infile):
             split = line.split('@')
             # episode
             episode.append(eval(split[0].split(':')[1]))
             # episode report
-            episode_report = eval(split[1].strip()[len("episode report:"):])
-            for k,L in episode_report_list.items():
-                L.append(episode_report[k])
+            episode_report = eval(split[1].strip()[len("online episode:"):])
+            if len(episode_report_list) == 0:
+                episode_report_list = {k:[v] for k,v in episode_report.items()}
+            else:
+                for k,L in episode_report_list.items():
+                    L.append(episode_report[k])
             # loss report
-            loss_report = eval(split[2].strip()[len("step loss:"):])
-            for k,L in loss_report_list.items():
-                L.append(loss_report[k])
+            loss_report = eval(split[2].strip()[len("training:"):])
+            if len(loss_report_list) == 0:
+                loss_report_list = {k:[v] for k,v in loss_report.items()}
+            else:
+                for k,L in loss_report_list.items():
+                    L.append(loss_report[k])
     info = {'episode': episode}
     info.update(episode_report_list)
     info.update(loss_report_list)

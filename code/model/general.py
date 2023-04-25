@@ -27,7 +27,8 @@ class BaseModel(nn.Module):
         print("\tl2_coef = " + str(self.l2_coef))
         print("\tdevice = " + str(self.device))
     
-    def __init__(self, args, reader_stats, device):
+    def __init__(self, *input_args):
+        args, reader_stats, device = input_args
         super(BaseModel, self).__init__()
         self.display_name = "BaseModel"
         self.reader_stats = reader_stats

@@ -7,7 +7,6 @@ from argparse import Namespace
 from torch.utils.data import DataLoader
 from torch.distributions import Categorical
 
-from env.reward import *
 from reader import *
 from model.simulator import *
 
