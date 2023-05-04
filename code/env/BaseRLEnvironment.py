@@ -14,7 +14,7 @@ class BaseRLEnvironment():
         - initial_temper
         '''
         parser.add_argument('--max_step_per_episode', type=int, default=100, help='max number of iteration allowed in each episode')
-        parser.add_argument('--initial_temper', type=int, required=100, help='initial temper of users')
+        parser.add_argument('--initial_temper', type=float, default=10, help='initial temper of users')
         return parser
     
     
