@@ -5,6 +5,7 @@ from copy import deepcopy
 from argparse import Namespace
 from torch.utils.data import DataLoader
 from torch.distributions import Categorical
+import torch.nn.functional as F
 
 import utils
 from reader import *
@@ -246,7 +247,8 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
             # when users left, new users come into the running batch
             if n_leave > 0:
                 final_steps = self.current_step[done_mask].detach().cpu().numpy()
-                self.env_history['step'].append(np.mean(final_steps))
+                for fst in final_steps:
+                    self.env_history['step'].append(fst)
 
                 if self.current_sample_head_in_batch + n_leave < self.episode_batch_size:
                     # reuse previous batch if there are sufficient samples for n_leave
@@ -277,7 +279,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         @input:
         - step_dict: {'action': (B, slate_size)}
         @output:
-        - response_dict: {'immediate_response': (B, slate_size, n_feedback, 
+        - response_dict: {'immediate_response': (B, slate_size, n_feedback), 
                           'user_state': (B, gt_state_dim), 
                           'coverage': scalar,
                           'ILD': scalar}
@@ -300,10 +302,11 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         # (B, slate_size, n_feedback)
         behavior_scores = out_dict['probs']
         
-        # item correlation
+        # (B, slate_size, item_dim)
         item_enc = self.candidate_item_encoding[action].view(B, self.slate_size, -1)
+        item_enc_norm = F.normalize(item_enc, p = 2.0, dim = -1)
         # (B, slate_size)
-        corr_factor = self.get_intra_slate_similarity(item_enc)
+        corr_factor = self.get_intra_slate_similarity(item_enc_norm)
 
         # user response sampling
         # (B, slate_size, n_feedback)
