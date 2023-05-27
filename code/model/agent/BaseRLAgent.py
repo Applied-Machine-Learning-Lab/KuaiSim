@@ -127,9 +127,9 @@ class BaseRLAgent():
         # register modules that will be saved
         self.registered_models = [(self.actor, self.actor_optimizer, '_actor')]
         
-        if len(self.n_iter) == 2:
+        if len(self.n_iter) == 1:
             with open(self.save_path + ".report", 'w') as outfile:
-                outfile.write(f"{args}\n")
+                outfile.write(f" ")
     
     def train(self):
         if len(self.n_iter) > 2:
