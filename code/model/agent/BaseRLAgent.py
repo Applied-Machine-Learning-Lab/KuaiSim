@@ -34,7 +34,8 @@ class BaseRLAgent():
         - initial_epsilon
         - final_epsilon
         - elbow_epsilon
-        - topk_rate
+        - explore_rate
+        - do_explore_in_train
         - check_episode
         - save_episode
         - save_path
@@ -126,9 +127,9 @@ class BaseRLAgent():
         # register modules that will be saved
         self.registered_models = [(self.actor, self.actor_optimizer, '_actor')]
         
-        if len(self.n_iter) == 2:
+        if len(self.n_iter) == 1:
             with open(self.save_path + ".report", 'w') as outfile:
-                outfile.write(f"{args}\n")
+                outfile.write(f" ")
     
     def train(self):
         if len(self.n_iter) > 2:
@@ -186,14 +187,7 @@ class BaseRLAgent():
         self.buffer.reset(self.env, self.actor)
         
         # training monitors
-        self.training_history = {'actor_loss': []}
-        self.eval_history = {'avg_reward': [],
-                             'reward_variance': [],
-                             'avg_total_reward': [0.],
-                             'max_total_reward': [0.],
-                             'min_total_reward': [0.]}
-        self.eval_history.update({f'{resp}_rate': [] for resp in self.env.response_types})
-        self.current_sum_reward = torch.zeros(self.env.episode_batch_size).to(torch.float).to(self.device)
+        self.setup_monitors()
         
         episode_iter = 0 # zero training iteration
         pre_epsilon = 1.0 # uniform random explore before training
@@ -205,6 +199,16 @@ class BaseRLAgent():
                                                 do_buffer_update, do_explore)
             prepare_step += 1
         print(f"Total {prepare_step} prepare steps")
+        
+    def setup_monitors(self):
+        self.training_history = {'actor_loss': []}
+        self.eval_history = {'avg_reward': [],
+                             'reward_variance': [],
+                             'avg_total_reward': [0.],
+                             'max_total_reward': [0.],
+                             'min_total_reward': [0.]}
+        self.eval_history.update({f'{resp}_rate': [] for resp in self.env.response_types})
+        self.current_sum_reward = torch.zeros(self.env.episode_batch_size).to(torch.float).to(self.device)
         
     
     def action_after_train(self):
@@ -302,19 +306,6 @@ class BaseRLAgent():
     def step_train(self):
         '''
         @process:
-        - buffer.sample(): batch_size --> observation, policy_output, user_response, done_mask, next_observation
-            - observation: see self.env.step@output - new_observation
-            - target_output: {
-                'state': (B,state_dim), 
-                'prob': (B,K),
-                'action': (B,K)}
-            - target_response: {
-                'reward': (B,),
-                'immediate_response': (B,K*n_feedback)}
-        - policy.get_forward(): observation, candidates --> policy_output
-        - policy.get_loss(): observation, candidates, policy_output, user_response --> loss
-        - optimizer.zero_grad(); loss.backward(); optimizer.step()
-        - update training history
         '''
         observation, policy_output, user_feedback, done_mask, next_observation = self.buffer.sample(self.batch_size)
         

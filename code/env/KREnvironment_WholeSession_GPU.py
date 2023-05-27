@@ -35,6 +35,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         - slate_size
         - episode_batch_size
         - item_correlation
+        - single_response
         - from BaseRLEnvironment
             - max_step_per_episode
             - initial_temper

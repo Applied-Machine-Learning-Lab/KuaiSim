@@ -1,5 +1,14 @@
 import torch
 
+def get_retention_reward(user_feedback, reward_base = 0.7):
+    '''
+    @input:
+    - user_feedback: {'retention': (B,), ...}
+    @output:
+    - reward: (B,)
+    '''
+    reward = - user_feedback['retention']/10.0
+    return reward
 
 def get_immediate_reward(user_feedback):
     '''
