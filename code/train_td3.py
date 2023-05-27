@@ -1,3 +1,8 @@
+######################################
+#  Code base: train_actor_critic.py  #
+######################################
+
+
 from tqdm import tqdm
 from time import time
 import torch
@@ -34,7 +39,7 @@ if __name__ == '__main__':
     agentClass = eval('{0}.{0}'.format(initial_args.agent_class))
     bufferClass = eval('{0}.{0}'.format(initial_args.buffer_class))
     
-    # experimental control args
+    # control args
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=11, help='random seed')
     parser.add_argument('--cuda', type=int, default=-1, help='cuda device number; set to -1 (default) if using cpu')
@@ -60,23 +65,24 @@ if __name__ == '__main__':
     print("Loading environment")
     env = envClass(args)
     
-    # Policy, Critic, Buffer, Agent
+    # Agent
     print("Setup policy:")
     policy = policyClass(args, env)
     policy.to(device)
     print(policy)
     print("Setup critic:")
-    critic = criticClass(args, env, policy)
-    critic.to(device)
-    print(critic)
+    critic1 = criticClass(args, env, policy)
+    critic2 = criticClass(args, env, policy)
+    critic1 = critic1.to(device)
+    critic2 = critic2.to(device)
+    print(critic1)
     print("Setup buffer:")
-    buffer = bufferClass(args, env, policy, critic)
+    buffer = bufferClass(args, env, policy, [critic1,critic2])
     print(buffer)
     print("Setup agent:")
-    agent = agentClass(args, env, policy, critic, buffer)
+    agent = agentClass(args, env, policy, [critic1,critic2], buffer)
     print(agent)
     
-    # online training
     try:
         print(args)
         agent.train()
@@ -86,6 +92,3 @@ if __name__ == '__main__':
         if exit_here.lower().startswith('y'):
             print(os.linesep + '-' * 20 + ' END: ' + utils.get_local_time() + ' ' + '-' * 20)
             exit(1)
-    
-    
-    

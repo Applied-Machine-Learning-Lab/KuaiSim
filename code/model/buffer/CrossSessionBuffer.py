@@ -4,8 +4,9 @@ import random
 import numpy as np
 
 import utils
+from model.buffer.BaseBuffer import BaseBuffer
 
-class BaseBuffer():
+class CrossSessionBuffer(BaseBuffer):
     '''
     The general buffer
     '''
@@ -16,18 +17,11 @@ class BaseBuffer():
         args:
         - buffer_size
         '''
-        parser.add_argument('--buffer_size', type=int, default=10000,
-                            help='replay buffer size')
+        parser = BaseBuffer.parse_model_args(parser)
         return parser
         
     def __init__(self, *input_args):
-        args, env, policy, critic = input_args
-        self.buffer_size = args.buffer_size
-        super().__init__()
-        self.device = args.device
-        self.buffer_head = 0
-        self.current_buffer_size = 0
-        self.n_stream_record = 0
+        super().__init__(*input_args)
         
     def reset(self, *reset_args):
         '''
@@ -39,32 +33,22 @@ class BaseBuffer():
                                                     'history_{response}': (L, max_H), 
                                                     'history_length': (L,)}}
                    'policy_output': {'state': (L, state_dim), 
-                                     'action': (L, action_dim), 
+                                     'action': (L, slate_size), 
                                      'prob': (L, slate_size)}, 
                    'next_observation': same format as @output-buffer['observation'], 
                    'done_mask': (L,),
                    'response': {'reward': (L,), 
-                                'immediate_response':, (L, slate_size * response_dim)}}
+                                'immediate_response':, (L, slate_size * response_dim), 
+                                'retention': (L,), ...}}
         '''
         env = reset_args[0]
         actor = reset_args[1]
-        observation = env.create_observation_buffer(self.buffer_size)
-        next_observation = env.create_observation_buffer(self.buffer_size)
-        policy_output = {'state': torch.zeros(self.buffer_size, actor.state_dim)\
-                                         .to(torch.float).to(self.device), 
-                         'action': torch.zeros(self.buffer_size, actor.action_dim)\
-                                         .to(torch.long).to(self.device), 
-                         'prob': torch.zeros(self.buffer_size, env.slate_size)\
-                                         .to(torch.long).to(self.device)}
-        reward = torch.zeros(self.buffer_size).to(torch.float).to(self.device)
-        done = torch.zeros(self.buffer_size).to(torch.bool).to(self.device)
-        im_response = torch.zeros(self.buffer_size, env.response_dim * env.slate_size)\
-                                         .to(torch.float).to(self.device)
-        self.buffer = {'observation': observation, 
-                       'policy_output': policy_output, 
-                       'user_response': {'reward': reward, 'immediate_response': im_response},
-                       'done_mask': done,
-                       'next_observation': next_observation}
+        
+        # observation, next_observation, policy_output, reward, done
+        self.buffer = super().reset(*reset_args)
+        self.buffer['policy_output']['action'] = self.buffer['policy_output']['action'].to(torch.float)
+        del self.buffer['policy_output']['prob']
+        self.buffer['user_response']['retention'] = torch.zeros(self.buffer_size).to(torch.float).to(self.device)
         return self.buffer
     
     
@@ -81,10 +65,10 @@ class BaseBuffer():
                                          'history_{response}': (B, max_H), 
                                          'history_length': (B,)}}
         - policy_output: {'state': (B, state_dim), 
-                          'action': (B, slate_size), 
-                          'prob': (B, slate_size)}, 
+                          'action': (B, slate_size)}, 
         - user_feedback: {'reward': (B,), 
-                          'immediate_response':, (B, slate_size * response_dim)}}
+                          'immediate_response':, (B, slate_size * response_dim),
+                          'retention': (B,)}}
         - done_mask: (B,),
         - next_observation: same format as @output - observation, 
         '''
@@ -100,11 +84,11 @@ class BaseBuffer():
         next_observation = {"user_profile": profile, "user_history": history}
         # policy output
         policy_output = {"state": self.buffer["policy_output"]["state"][indices], 
-                         "action": self.buffer["policy_output"]["action"][indices], 
-                         "prob": self.buffer["policy_output"]["prob"][indices]}
+                         "action": self.buffer["policy_output"]["action"][indices]}
         # user response
         user_response = {"reward": self.buffer["user_response"]["reward"][indices], 
-                         "immediate_response": self.buffer["user_response"]["immediate_response"][indices]}
+                         "immediate_response": self.buffer["user_response"]["immediate_response"][indices], 
+                         "retention": self.buffer["user_response"]["retention"][indices]}
         # done mask
         done_mask = self.buffer["done_mask"][indices]
         return observation, policy_output, user_response, done_mask, next_observation
@@ -121,9 +105,9 @@ class BaseBuffer():
         - policy_output: {'user_state': (B, state_dim), 
                           'prob': (B, action_dim),
                           'action': (B, action_dim)}
-        - user_feedback: {'done': (B,), 
-                          'immdiate_response':, (B, action_dim * feedback_dim), 
-                          'reward': (B,)}
+        - user_feedback: {'immdiate_response':, (B, action_dim * feedback_dim), 
+                          'reward': (B,), 
+                          'retention': (B,)}
         - next_observation: same format as update_buffer@input-observation
         '''
         # get buffer indices to update
@@ -149,10 +133,10 @@ class BaseBuffer():
         # update buffer - policy output
         self.buffer['policy_output']['state'][indices] = policy_output['state']
         self.buffer['policy_output']['action'][indices] = policy_output['action']
-        self.buffer['policy_output']['prob'][indices] = policy_output['prob']
         # update buffer - user response
         self.buffer['user_response']['immediate_response'][indices] = user_feedback['immediate_response'].view(B,-1)
         self.buffer['user_response']['reward'][indices] = user_feedback['reward']
+        self.buffer['user_response']['retention'][indices] = user_feedback['retention']
         # update buffer - done
         self.buffer['done_mask'][indices] = user_feedback['done']
         

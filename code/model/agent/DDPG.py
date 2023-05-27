@@ -78,20 +78,15 @@ class DDPG(BaseRLAgent):
 
         # register models that will be saved
         self.registered_models.append((self.critic, self.critic_optimizer, "_critic"))
+
         
-        
-    def action_before_train(self):
+    def setup_monitors(self):
         '''
-        Action before training:
-        - buffer setup
-        - monitor setup
-        - run random episodes to build-up the initial buffer
+        This is used in super().action_before_train() in super().train()
+        Then the agent will call several rounds of run_episode_step() for collecting initial random data samples
         '''
-        super().action_before_train()
-        
-        # training records
-        self.training_history = {'actor_loss': [], 'critic_loss': [], 
-                                 'Q': [], 'next_Q': []}
+        super().setup_monitors()
+        self.training_history.update({'actor_loss': [], 'critic_loss': [], 'Q': [], 'next_Q': []})
         
 
     def step_train(self):
@@ -215,7 +210,7 @@ class DDPG(BaseRLAgent):
     def apply_critic(self, observation, policy_output, critic):
         feed_dict = {'state': policy_output['state'],
                      'action': policy_output['hyper_action']}
-        return self.critic(feed_dict)
+        return critic(feed_dict)
 
     def save(self):
         super().save()

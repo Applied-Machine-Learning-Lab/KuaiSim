@@ -19,10 +19,10 @@ class BaseRLEnvironment():
     
     
     def __init__(self, args):
+        self.device = args.device
         super().__init__()
         self.max_step_per_episode = args.max_step_per_episode
         self.initial_temper = args.initial_temper
-        self.device = args.device
         
     def reset(self, params):
         pass

@@ -11,6 +11,7 @@ from reader import *
 from model.simulator import *
 from utils import wrap_batch, show_batch
 
+
 if __name__ == '__main__':
     
     init_parser = argparse.ArgumentParser()

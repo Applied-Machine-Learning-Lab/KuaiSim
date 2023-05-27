@@ -6,14 +6,16 @@ mkdir -p output/Kuairand_Pure/
 mkdir -p output/Kuairand_Pure/agents/
 
 output_path="output/Kuairand_Pure/"
-log_name="user_KRMBUserResponse_lr0.0001_reg0.01_nlayer2"
+log_name="user_KRMBUserResponse_lr0.0001_reg0_nlayer2"
 
 # environment args
 ENV_CLASS='KREnvironment_WholeSession_GPU'
+# ENV_CLASS='KREnvironment_WholeSession_TemperDiscount'
 MAX_STEP=20
 SLATE_SIZE=6
 EP_BS=32
 RHO=0.2
+TEMPER_DISCOUNT=2.0
 
 # policy args
 POLICY_CLASS='OneStageHyperPolicy_with_DotScore'
@@ -51,11 +53,14 @@ do
         do
             for CRITIC_LR in 0.001
             do
-                for ACTOR_LR in 0.00001 0.00003 0.0001 0.0003
+                for ACTOR_LR in 0.0001
                 do
                     for SEED in 11 # 13 17 19 23
                     do
-                        mkdir -p ${output_path}agents/ddpg_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/
+                    
+                        file_key=${AGENT_CLASS}_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}
+                        
+                        mkdir -p ${output_path}agents/${file_key}/
 
                         python train_actor_critic.py\
                             --env_class ${ENV_CLASS}\
@@ -71,6 +76,7 @@ do
                             --slate_size ${SLATE_SIZE}\
                             --episode_batch_size ${EP_BS}\
                             --item_correlation ${RHO}\
+                            --temper_discount ${TEMPER_DISCOUNT}\
                             --single_response\
                             --policy_action_hidden 256 64\
                             --policy_noise_var ${HA_VAR}\
@@ -96,14 +102,14 @@ do
                             --explore_rate ${EXPLORE_RATE}\
                             --check_episode 10\
                             --save_episode 200\
-                            --save_path ${output_path}agents/ddpg_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/model\
+                            --save_path ${output_path}agents/${file_key}/model\
                             --actor_lr ${ACTOR_LR}\
                             --actor_decay ${REG}\
                             --batch_size ${BS}\
                             --critic_lr ${CRITIC_LR}\
                             --critic_decay ${REG}\
                             --target_mitigate_coef 0.01\
-                            > ${output_path}agents/ddpg_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/log
+                            > ${output_path}agents/${file_key}/log
                     done
                 done
             done
