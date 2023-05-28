@@ -1,0 +1,13 @@
+gan_sd:
+  dim_user_feature: 91
+  dim_random_seed: 128
+  dim_hidden: 128
+
+user:
+  dim_state:
+  dim_action:
+
+
+platform:
+  dim_state:
+  dim_action:
