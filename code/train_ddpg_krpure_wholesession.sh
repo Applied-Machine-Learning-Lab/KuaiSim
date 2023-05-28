@@ -51,11 +51,11 @@ do
         do
             for CRITIC_LR in 0.001
             do
-                for ACTOR_LR in 0.00001 0.00003 0.0001 0.0003
+                for ACTOR_LR in 0.00001 # 0.00003 0.0001 0.0003
                 do
                     for SEED in 11 # 13 17 19 23
                     do
-                        mkdir -p ${output_path}agents/ddpg_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/
+                        mkdir -p ${output_path}agents/ddpg_${ENV_CLASS}_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/
 
                         python train_actor_critic.py\
                             --env_class ${ENV_CLASS}\
@@ -96,14 +96,14 @@ do
                             --explore_rate ${EXPLORE_RATE}\
                             --check_episode 10\
                             --save_episode 200\
-                            --save_path ${output_path}agents/ddpg_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/model\
+                            --save_path ${output_path}agents/ddpg_${ENV_CLASS}_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/model\
                             --actor_lr ${ACTOR_LR}\
                             --actor_decay ${REG}\
                             --batch_size ${BS}\
                             --critic_lr ${CRITIC_LR}\
                             --critic_decay ${REG}\
                             --target_mitigate_coef 0.01\
-                            > ${output_path}agents/ddpg_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/log
+                            > ${output_path}agents/ddpg_${ENV_CLASS}_${POLICY_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${HA_VAR}_bs${BS}_epbs${EP_BS}_step${MAX_STEP}_seed${SEED}/log
                     done
                 done
             done
