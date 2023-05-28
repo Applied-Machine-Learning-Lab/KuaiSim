@@ -145,7 +145,7 @@ class BaseRLAgent():
         step_offset = sum(self.n_iter[:-1])
         do_buffer_update = True
         observation = deepcopy(self.env.current_observation)
-        for i in tqdm(range(step_offset, step_offset + self.n_iter[-1])):
+        for i in tqdm(range(step_offset, step_offset + self.n_iter[-1]//10)):
             do_explore = np.random.random() < self.explore_rate if self.explore_rate < 1 else True
             # online inference
             observation = self.run_episode_step(i, self.exploration_scheduler.value(i), observation, 
@@ -167,7 +167,7 @@ class BaseRLAgent():
             # save model and training info
             if i % self.save_episode == 0:
                 self.save()
-                
+               
         self.action_after_train()
         
     
@@ -199,6 +199,7 @@ class BaseRLAgent():
         pre_epsilon = 1.0 # uniform random explore before training
         do_buffer_update = True
         prepare_step = 0
+        
         for i in tqdm(range(self.start_policy_train_at_step)):
             do_explore = np.random.random() < self.explore_rate
             observation = self.run_episode_step(episode_iter, pre_epsilon, observation, 
@@ -255,9 +256,9 @@ class BaseRLAgent():
             # monitor update
             self.eval_history['avg_reward'].append(R.mean().item())
             self.eval_history['reward_variance'].append(torch.var(R).item())
+            
             for i,resp in enumerate(self.env.response_types):
-                self.eval_history[f'{resp}_rate'].append(user_feedback['immediate_response'][:,:,i].mean().item())
-                
+                self.eval_history[f'{resp}_rate'].append(user_feedback['immediate_response'][:,:,i].mean().item())  
             # update replay buffer
             if do_buffer_update:
                 self.buffer.update(observation, policy_output, user_feedback, update_info['updated_observation'])
