@@ -61,9 +61,13 @@ class OneStageHyperPolicy_with_DotScore(OneStagePolicy):
     def generate_action(self, state_dict, feed_dict):
         '''
         List generation provides three main types of exploration:
-        * Greedy top-K: no exploration
-        * Categorical sampling: probabilistic exploration
-        * Uniform sampling: random exploration
+        * Greedy top-K: no exploration, set do_effect_action_explore=False in args or do_explore=False in feed_dict
+        * Categorical sampling: probabilistic exploration, set do_effect_action_explore=True in args, 
+                                set do_explore=True and epsilon < 1 in feed_dict
+        * Uniform sampling : random exploration, set do_effect_action_explore=True in args,
+                             set do_explore=True, epsilon > 0 in feed_dict
+        * Gaussian sampling on hyper-action: set do_explore=True, epsilon < 1 in feed_dict
+        * Uniform sampling on hyper-action: set do_explore=True, epsilon > 0 in feed_dict
         
         @input:
         - state_dict: {'state': (B, state_dim), ...}

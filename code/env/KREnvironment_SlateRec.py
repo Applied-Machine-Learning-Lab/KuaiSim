@@ -12,9 +12,9 @@ from reader import *
 from model.simulator import *
 from env.BaseRLEnvironment import BaseRLEnvironment
 
-class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
+class KREnvironment_SlateRec(BaseRLEnvironment):
     '''
-    KuaiRand simulated environment for consecutive list-wise recommendation
+    KuaiRand simulated environment for list-wise recommendation
     Main interface:
     - parse_model_args: for hyperparameters
     - reset: reset online environment, monitor, and corresponding initial observation
@@ -31,26 +31,19 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
     def parse_model_args(parser):
         '''
         args:
-        - uirm_log_path
-        - slate_size
-        - episode_batch_size
-        - item_correlation
-        - single_response
-        - from BaseRLEnvironment
-            - max_step_per_episode
-            - initial_temper
+        - from BaseRLEnvironment:
+            - uirm_log_path
+            - slate_size
+            - episode_batch_size
+            - item_correlation
+            - single_response
+            - from BaseRLEnvironment
+                - max_step_per_episode
+                - initial_temper
         '''
         parser = BaseRLEnvironment.parse_model_args(parser)
-        parser.add_argument('--uirm_log_path', type=str, required=True, 
-                            help='log path for pretrained user immediate response model')
-        parser.add_argument('--slate_size', type=int, required=6, 
-                            help='number of item per recommendation slate')
-        parser.add_argument('--episode_batch_size', type=int, default=32, 
-                            help='episode sample batch size')
-        parser.add_argument('--item_correlation', type=float, default=0, 
-                            help='magnitude of item correlation')
-        parser.add_argument('--single_response', action='store_true', 
-                            help='only include the first feedback as reward signal')
+        parser.add_argument('--slate_reader_class', type=str, default='', 
+                            help='offline training may use different data reader')
         return parser
     
     def __init__(self, args):
@@ -77,7 +70,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         self.observation_space: see reader.get_statistics()
         self.action_space: n_condidate
         '''
-        super(KREnvironment_WholeSession_GPU, self).__init__(args)
+        super(KREnvironment_SlateRec, self).__init__(args)
         self.uirm_log_path = args.uirm_log_path
         self.slate_size = args.slate_size
         self.episode_batch_size = args.episode_batch_size
@@ -139,23 +132,15 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         
         
     
-    def get_candidate_info(self, feed_dict, all_item=True):
+    def get_candidate_info(self, feed_dict):
         '''
         Add entire item pool as candidate for the feed_dict
-        @input:
-        - all_item: whether obtain all item features from candidate pool
-        - feed_dict
         @output:
         - candidate_info: {'item_id': (L,), 
                            'if_{feature_name}': (n_item, feature_dim)}
         '''
-        if all_item:
-            candidate_info = {'item_id': self.candidate_iids}
-            candidate_info.update(self.candidate_item_meta)
-        else:
-            candidate_info = {'item_id': feed_dict['item_id']}
-            indices = feed_dict['item_id'] - 1
-            candidate_info.update({k: v[indices] for k,v in self.candidate_item_meta.items()})
+        candidate_info = {'item_id': self.candidate_iids}
+        candidate_info.update(self.candidate_item_meta)
         return candidate_info
         
     
