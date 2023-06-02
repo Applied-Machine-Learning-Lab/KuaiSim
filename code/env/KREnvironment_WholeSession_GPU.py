@@ -90,7 +90,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         print("Environment arguments: \n" + str(model_args))
         infile.close()
         print("Loading raw data")
-        assert class_args.reader == 'KRMBSeqReader' and 'KRMBUserResponse' in class_args.model
+        assert (class_args.reader == 'KRMBSeqReader' or class_args.reader == 'MLSeqReader') and 'KRMBUserResponse' in class_args.model
         
         print("Load user sequence reader")
         reader, reader_args = self.get_reader(args.uirm_log_path) # definition in base

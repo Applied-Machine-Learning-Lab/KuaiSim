@@ -57,7 +57,9 @@ do
 done
 
 
+
 # MODEL='KRMBUserResponse_MaxOut'
+# MODEL='KRMBUserResponse'
 
 # for LR in 0.0001 # 0.00001 0.001
 # do
