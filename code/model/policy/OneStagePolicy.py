@@ -74,12 +74,14 @@ class OneStagePolicy(BaseModel):
             'response': {
                 'reward': (B,),
                 'immediate_response': (B,K*n_feedback)},
-            'is_train': boolean
+            'is_train': boolean,
+            'batch_wise': boolean
         }
         @output:
         - out_dict: {
             'state': (B,state_dim), 
             'prob': (B,K),
+            'all_prob': (B,L),
             'action': (B,K),
             'reg': scalar}
         '''
@@ -122,8 +124,25 @@ class OneStagePolicy(BaseModel):
         - feed_dict: same as self.get_forward@input - feed_dict
         @output:
         - out_dict: {'prob': (B, K), 
+                     'all_prob': (B, L),
                      'action': (B, K), 
-                     'indices': (B, K),
                      'reg': scalar}
+        '''
+        pass
+    
+    
+    def get_loss(self, feed_dict, out_dict):
+        '''
+        @input:
+        - feed_dict: same as get_forward@input-feed_dict
+        - out_dict: {
+            'state': (B,state_dim), 
+            'prob': (B,K),
+            'action': (B,K),
+            'reg': scalar, 
+            'immediate_response': (B,K),
+            'reward': (B,)}
+        @output
+        - loss
         '''
         pass

@@ -55,7 +55,7 @@ class BaseBuffer():
                          'action': torch.zeros(self.buffer_size, actor.action_dim)\
                                          .to(torch.long).to(self.device), 
                          'prob': torch.zeros(self.buffer_size, env.slate_size)\
-                                         .to(torch.long).to(self.device)}
+                                         .to(torch.float).to(self.device)}
         reward = torch.zeros(self.buffer_size).to(torch.float).to(self.device)
         done = torch.zeros(self.buffer_size).to(torch.bool).to(self.device)
         im_response = torch.zeros(self.buffer_size, env.response_dim * env.slate_size)\

@@ -9,17 +9,20 @@ mkdir -p output/Kuairand_${KR_FLAG}/env/log
 output_path=output/Kuairand_${KR_FLAG}/
 
 # data source path
-data_path=dataset/Kuairand-${KR_FLAG}/
+data_path=dataset/Kuairand_${KR_FLAG}/
 
-# MODEL='KRMBUserResponse'
-MODEL='KRMBUserResponseWithBias'
+MODEL='KRMBUserResponse'
+# MODEL='KRMBUserResponseWithBias'
 
-for LR in 0.0001 # 0.00001 0.001
+for LR in 0.0001 0.00001
 do
-    for REG in 0.01 # 0
+    for REG in 0
     do
         for N_LAYER in 2
         do
+        
+            file_key=user_${MODEL}_lr${LR}_reg${REG}_nlayer${N_LAYER}
+            
             python train_multibehavior.py\
                 --epoch 10\
                 --seed 619607\
@@ -40,7 +43,7 @@ do
                 --model ${MODEL}\
                 --loss 'bce'\
                 --l2_coef ${REG}\
-                --model_path ${output_path}env/user_${MODEL}_lr${LR}_reg${REG}_nlayer${N_LAYER}.model\
+                --model_path ${output_path}env/${file_key}.model\
                 --user_latent_dim 32\
                 --item_latent_dim 32\
                 --enc_dim 64\
@@ -51,7 +54,7 @@ do
                 --state_hidden_dims 128\
                 --scorer_hidden_dims 128 32\
                 --dropout_rate 0.1\
-                > ${output_path}env/log/user_${MODEL}_lr${LR}_reg${REG}_nlayer${N_LAYER}.model.log
+                > ${output_path}env/log/${file_key}.model.log
         done
     done
 done

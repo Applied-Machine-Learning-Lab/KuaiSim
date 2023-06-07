@@ -320,6 +320,7 @@ class KRMBUserResponse(BaseModel):
                 point_loss = self.bce_loss(self.sigmoid(P), Y)
                 behavior_loss[fb] = torch.mean(point_loss).item()
                 point_loss = torch.mean(point_loss * W)
+                point_loss = torch.mean(point_loss)
                 loss = self.behavior_weight[i] * point_loss + loss
         else:
             raise NotImplemented

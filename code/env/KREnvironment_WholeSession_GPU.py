@@ -379,7 +379,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         done_mask = self.current_temper < 1
         return done_mask
         
-    def update_observation(self, user_state, action, response, done_mask):
+    def update_observation(self, user_state, action, response, done_mask, update_current = True):
         '''
         user profile stays static, only update user history
         @input:
@@ -412,8 +412,11 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         for i,R in enumerate(self.immediate_response_model.feedback_types):
             k = f'history_{R}'
             new_history[k] = torch.cat((old_history[k], response[:,:,i]), dim = 1)[:,-max_H:]
-        self.current_observation['user_history'] = new_history
-        return {'slate': rec_list, 'updated_observation': deepcopy(self.current_observation)}
+        if update_current:
+            self.current_observation['user_history'] = new_history
+        return {'slate': rec_list, 'updated_observation': {
+                                        'user_profile': deepcopy(self.current_observation['user_profile']), 
+                                        'user_history': deepcopy(new_history)}}
     
     def sample_new_batch_from_reader(self):
         '''
