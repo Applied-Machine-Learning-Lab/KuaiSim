@@ -92,21 +92,12 @@ class DDPG(BaseRLAgent):
     def step_train(self):
         '''
         @process:
-        - buffer.sample(): batch_size --> observation, policy_output, user_response, done_mask, next_observation
-            - observation: see self.env.step@output - new_observation
-            - policy_output: {
-                'state': (B,state_dim), 
-                'action': (B,K),
-                ...}
-            - user_feedback: {
-                'reward': (B,),
-                'immediate_response': (B,K*n_feedback)}
-            - done_mask
-            - next_observation
-        - policy.get_forward(): observation, candidates --> policy_output
-        - policy.get_loss(): observation, candidates, policy_output, user_response --> loss
-        - optimizer.zero_grad(); loss.backward(); optimizer.step()
-        - update training history
+        - get sample
+        - calculate Q'(s_{t+1}, a_{t+1}) and Q(s_t, a_t)
+        - critic loss: TD error loss
+        - critic optimization
+        - actor loss: Q(s_t, \pi(s_t)) maximization
+        - actor optimization
         '''
         
         observation, policy_output, user_feedback, done_mask, next_observation = self.buffer.sample(self.batch_size)

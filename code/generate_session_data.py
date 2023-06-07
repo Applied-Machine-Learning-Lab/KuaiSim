@@ -45,6 +45,7 @@ if __name__ == '__main__':
     model.load_from_checkpoint(with_optimizer = False)
 
     df = reader.log_data
+
     print('#user:', len(df['user_id'].unique()), ' #item:', len(df['video_id'].unique()), ' #record:', len(df))
 
     model = model.to(device)

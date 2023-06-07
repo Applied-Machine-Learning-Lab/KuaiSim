@@ -14,7 +14,7 @@ from env.BaseRLEnvironment import BaseRLEnvironment
 
 class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
     '''
-    KuaiRand simulated environment for list-wise recommendation
+    KuaiRand simulated environment for consecutive list-wise recommendation
     Main interface:
     - parse_model_args: for hyperparameters
     - reset: reset online environment, monitor, and corresponding initial observation
@@ -90,7 +90,7 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         print("Environment arguments: \n" + str(model_args))
         infile.close()
         print("Loading raw data")
-        assert class_args.reader == 'KRMBSeqReader' and 'KRMBUserResponse' in class_args.model
+        assert (class_args.reader == 'KRMBSeqReader' or class_args.reader == 'MLSeqReader') and 'KRMBUserResponse' in class_args.model
         
         print("Load user sequence reader")
         reader, reader_args = self.get_reader(args.uirm_log_path) # definition in base
@@ -139,15 +139,23 @@ class KREnvironment_WholeSession_GPU(BaseRLEnvironment):
         
         
     
-    def get_candidate_info(self, feed_dict):
+    def get_candidate_info(self, feed_dict, all_item=True):
         '''
         Add entire item pool as candidate for the feed_dict
+        @input:
+        - all_item: whether obtain all item features from candidate pool
+        - feed_dict
         @output:
         - candidate_info: {'item_id': (L,), 
                            'if_{feature_name}': (n_item, feature_dim)}
         '''
-        candidate_info = {'item_id': self.candidate_iids}
-        candidate_info.update(self.candidate_item_meta)
+        if all_item:
+            candidate_info = {'item_id': self.candidate_iids}
+            candidate_info.update(self.candidate_item_meta)
+        else:
+            candidate_info = {'item_id': feed_dict['item_id']}
+            indices = feed_dict['item_id'] - 1
+            candidate_info.update({k: v[indices] for k,v in self.candidate_item_meta.items()})
         return candidate_info
         
     

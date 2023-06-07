@@ -27,7 +27,6 @@ if __name__ == '__main__':
     
     initial_args, _ = init_parser.parse_known_args()
     print(initial_args)
-    
     envClass = eval('{0}.{0}'.format(initial_args.env_class))
     policyClass = eval('{0}.{0}'.format(initial_args.policy_class))
     criticClass = eval('{0}.{0}'.format(initial_args.critic_class))
@@ -66,8 +65,15 @@ if __name__ == '__main__':
     policy.to(device)
     print(policy)
     print("Setup critic:")
-    critic = criticClass(args, env, policy)
-    critic.to(device)
+    if initial_args.agent_class == 'TD3':
+        critic1 = criticClass(args, env, policy)
+        critic1.to(device)
+        critic2 = criticClass(args, env, policy)
+        critic2.to(device)
+        critic = [critic1, critic2]
+    else:
+        critic = criticClass(args, env, policy)
+        critic.to(device)
     print(critic)
     print("Setup buffer:")
     buffer = bufferClass(args, env, policy, critic)

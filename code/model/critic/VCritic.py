@@ -32,7 +32,7 @@ class VCritic(nn.Module):
         @input:
         - feed_dict: {'state_emb': (B, state_dim), 'action_emb': (B, action_dim)}
         '''
-        state_emb = feed_dict['state_emb']
+        state_emb = feed_dict['state']
         V = self.net(state_emb).view(-1)
         reg = get_regularization(self.net)
         return {'v': V, 'reg': reg}

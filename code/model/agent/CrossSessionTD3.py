@@ -148,7 +148,7 @@ class CrossSessionTD3(BaseRLAgent):
         done_mask = done_mask.to(torch.float)
         
         critic_loss_list, actor_loss = self.get_td3_loss(observation, policy_output, reward, done_mask, next_observation)
-        target_Q, next_Q1, next_Q2, Q1, Q1_loss, Q2, Q2_loss = critic_loss_list
+        target_Q, next_Q1, next_Q2, Q1_loss, Q1, Q2_loss, Q2 = critic_loss_list
         self.training_history['actor_loss'].append(actor_loss.item())
         self.training_history['Q1_loss'].append(Q1_loss)
         self.training_history['Q2_loss'].append(Q2_loss)

@@ -16,7 +16,7 @@ MAX_SESSION=6
 MAX_RET_DAY=10
 MAX_STEP=5
 RET_DAY_BIAS=0.4
-FEEDBACK_INF_RETURN=0.0
+FEEDBACK_INF_RETURN=0.1
 SLATE_SIZE=6
 EP_BS=32
 RHO=0.2
@@ -54,7 +54,7 @@ do
             do
                 for SEED in 11 # 11 13 17 19 23
                 do
-                    file_key=td3_${POLICY_CLASS}_${ENV_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${NOISE}_bs${BS}_epbs${EP_BS}_seed${SEED}
+                    file_key=td3_${POLICY_CLASS}_${ENV_CLASS}_actor${ACTOR_LR}_critic${CRITIC_LR}_niter${N_ITER}_reg${REG}_ep${INITEP}_noise${NOISE}_bs${BS}_epbs${EP_BS}_fret${FEEDBACK_INF_RETURN}_seed${SEED}
                     
                     mkdir -p ${output_path}/${file_key}/
 
