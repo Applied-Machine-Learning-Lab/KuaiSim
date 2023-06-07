@@ -89,7 +89,6 @@ class BaseRLAgent():
         args, env, actor, buffer = input_args
         
         self.device = args.device
-        self.n_iter = [0] + args.n_iter
 
         # hyperparameters
         self.gamma = args.gamma
@@ -293,9 +292,6 @@ class BaseRLAgent():
                       'do_explore': do_explore, 
                       'is_train': is_train, 
                       'batch_wise': False}
-        if is_train:
-            input_dict['target_action'] = policy_args[3]
-            input_dict['target_response'] = policy_args[4]
         out_dict = self.actor(input_dict)
         return out_dict
     

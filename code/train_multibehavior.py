@@ -114,7 +114,7 @@ if __name__ == '__main__':
             for i, batch_data in enumerate(train_loader):
                 optimizer.zero_grad()
                 wrapped_batch = utils.wrap_batch(batch_data, device = device)
-                if epo == 0 and i == 0:
+                if epo == 1 and i == 0:
                     utils.show_batch(wrapped_batch)
                 out_dict = model.do_forward_and_loss(wrapped_batch)
                 loss = out_dict['loss']

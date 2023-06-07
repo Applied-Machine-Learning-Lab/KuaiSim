@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import math
 
 from reader.BaseReader import BaseReader
 from utils import padding_and_clip, get_onehot_vocab, get_multihot_vocab
@@ -190,7 +191,9 @@ class KRMBSeqReader(BaseReader):
         }
         for _,f in enumerate(self.response_list):
             record[f] = row[f]
-        loss_weight = np.array([1. if record[f] == 1 else self.response_neg_sample_rate[f] \
+        loss_weight = np.array([1. if record[f] == 1 \
+                                    else -self.response_neg_sample_rate[f] if f == 'is_hate' \
+                                        else self.response_neg_sample_rate[f]\
                                 for i,f in enumerate(self.response_list)])
         record["loss_weight"] = loss_weight
         
