@@ -137,9 +137,9 @@ bash train_{model name}_krpure_crosssession.sh
 
 | Algorithm | Return time **↓** | User retention ↑ |
 | :-------: | :---------------: | :--------------: |
-|    CEM    |       2.036       |      0.587       |
-|    TD3    |       2.009       |      0.592       |
-|   RLUR    |     **1.892**     |     **0.61**     |
+|    CEM    |       3.573       |      0.572       |
+|    TD3    |       3.556       |      0.581       |
+|   RLUR    |     **3.481**     |     **0.607**     |
 
 
 
