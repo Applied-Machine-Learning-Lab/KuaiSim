@@ -159,3 +159,22 @@ Training other simulators:
 Training on ML-1m dataset:
 
 > bash train_ddpg_krpure_wholesession_ml.sh
+
+
+# Reference
+
+[1] Zhao, K., Liu, S., Cai, Q., Zhao, X., Liu, Z., Zheng, D., ... & Gai, K. (2023). KuaiSim: A comprehensive simulator for recommender systems. arXiv preprint arXiv:2309.12645.
+
+# BibTeX entry
+
+Please cite the paper if you use this code in your work:
+
+
+```
+@article{zhao2023kuaisim,
+  title={KuaiSim: A comprehensive simulator for recommender systems},
+  author={Zhao, Kesen and Liu, Shuchang and Cai, Qingpeng and Zhao, Xiangyu and Liu, Ziru and Zheng, Dong and Jiang, Peng and Gai, Kun},
+  journal={arXiv preprint arXiv:2309.12645},
+  year={2023}
+}
+```
